@@ -11,8 +11,8 @@ const center = {
   lng: 127.835941
 };
 
-const MAP_API_KEY = 'AIzaSyDLaff4Af2a3lO_UvfNsy-QzKCnDnV9Ol0';
-const MOUNTAIN_API_KEY = 'GM2bKdaGinIelgRZx7EEEyYv27HTHfFwZruRfGFxIWsjag8Xj%2BMATGK5rS38CISJTlRIIziNpe4eiVFpW97zlQ%3D%3D';
+const MAP_API_KEY = //여기에 지도 api 키 입력
+const MOUNTAIN_API_KEY = //여기에 등산로 api 키 입력
 
 async function getData(){
   const url=`http://openapi.forest.go.kr/openapi/service/trailInfoService/getforestspatialdataservice?mntnNm=고리봉&serviceKey=${MOUNTAIN_API_KEY}&pageNo=1&numOfRows=10&`
