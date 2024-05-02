@@ -1,91 +1,82 @@
 import React, { useState } from 'react';
-import { GoogleMap, LoadScript, } from '@react-google-maps/api';
+import { GoogleMap, LoadScript } from '@react-google-maps/api';
 import JSZip from 'jszip';
 
+const MAP_API_KEY = 'AIzaSyDLaff4Af2a3lO_UvfNsy-QzKCnDnV9Ol0';
+const MOUNTAIN_API_KEY = 'GM2bKdaGinIelgRZx7EEEyYv27HTHfFwZruRfGFxIWsjag8Xj%2BMATGK5rS38CISJTlRIIziNpe4eiVFpW97zlQ%3D%3D';
+
 const containerStyle = {
-  width: '1400px',
+  width: '100%',
   height: '800px'
 };
-
-const center = {
-  lat: 37.018000,
-  lng: 127.835941
-};
-
-const MAP_API_KEY = //지도 api 키 입력
-const MOUNTAIN_API_KEY = //등산로 api 키 입력
 
 function App() {
   const [mountainName, setMountainName] = useState('');
   const [trailData, setTrailData] = useState(null);
   const [searchError, setSearchError] = useState(false); // 검색 오류 여부
+  const [center, setCenter] = useState(null); // 중심 좌표 상태 추가
 
-  // 입력된 산 이름을 상태로 저장
   const handleInputChange = (event) => {
     setMountainName(event.target.value);
   };
 
-  // 검색 버튼 눌렀을 때 호출
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!mountainName.trim()) {
       setSearchError(true);
       return; // 공백 검색시 검색을 수행하지 않음
     }
+
+    const geocoder = new window.google.maps.Geocoder();
+
+    geocoder.geocode({ address: mountainName }, (results, status) => {
+      if (status === "OK") {
+        const mt_pt = results[0].geometry.location;
+
+        setCenter({
+          lat: mt_pt.lat(),
+          lng: mt_pt.lng()
+        });
+      } else {
+        console.error("지리적 검색 요청 실패:", status);
+      }
+    });
+
     try {
-      // API를 호출하여 산 이름에 해당하는 등산로 정보를 가져옴
       const url = `http://openapi.forest.go.kr/openapi/service/trailInfoService/getforestspatialdataservice?mntnNm=${encodeURIComponent(mountainName)}&serviceKey=${MOUNTAIN_API_KEY}&pageNo=1&numOfRows=10&`;
       const response = await fetch(url);
       const data = await response.text();
-      const data_info = new DOMParser().parseFromString(data, "text/xml");
+      const parser = new DOMParser();
+      const data_info = parser.parseFromString(data, "text/xml");
       console.log("data", data_info);
 
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(data, "text/xml");
-        
-      // XML에서 ZIP 파일 URL 추출
-      const zipFileURL = xmlDoc.getElementsByTagName('mntnfile')[0].textContent;
-
-      // ZIP 파일 다운로드 및 내부 파일 접근
+      const zipFileURL = data_info.getElementsByTagName('mntnfile')[0].textContent;
       handleZipFile(zipFileURL);
 
-      // 받아온 데이터가 없으면 검색 결과가 없음을 알리는 메시지를 표시
       if (data_info.getElementsByTagName('totalCount')[0].textContent === '0') {
         setSearchError(true);
       } else {
-        setTrailData(data_info); 
-        setSearchError(false); // 검색 오류 상태 초기화
+        setTrailData(data_info);
+        setSearchError(false);
       }
     } catch (error) {
       console.error('데이터를 가져오는 중 오류가 발생했습니다:', error);
-      setSearchError(true); 
+      setSearchError(true);
     }
   };
 
-  //받아온 ZIP파일 처리 함수
   const handleZipFile = async (zipFileURL) => {
     try {
-        // ZIP 파일 다운로드
-        const zipResponse = await fetch(zipFileURL);
-        const zipBlob = await zipResponse.blob();
-
-        // JSZip을 사용하여 ZIP 파일 해제
-        const zip = await JSZip.loadAsync(zipBlob);
-
-        // ZIP 파일 내의 파일 목록 확인
-        zip.forEach((relativePath, zipEntry) => {
-            //파일 이름 출력
-            console.log("File:", relativePath);
-            
-            // 파일 내용
-            zipEntry.async("string").then((content) => {
-                //console.log("Contents:", content);
-            });
-        });
+      const zipResponse = await fetch(zipFileURL);
+      const zipBlob = await zipResponse.blob();
+      const zip = await JSZip.loadAsync(zipBlob);
+      zip.forEach((relativePath, zipEntry) => {
+        console.log("File:", relativePath);
+      });
     } catch (error) {
-        console.error('ZIP 파일을 다운로드하거나 해제하는 중 오류가 발생했습니다:', error);
+      console.error('ZIP 파일을 다운로드하거나 해제하는 중 오류가 발생했습니다:', error);
     }
-};
+  };
 
   return (
     <div className="App">
@@ -105,19 +96,15 @@ function App() {
       </form>
       {trailData && <p>{mountainName}에 대한 등산로 정보를 검색합니다.</p>}
       {searchError && <p>검색 결과가 없습니다.</p>}
-      <div>
-        <LoadScript
-          googleMapsApiKey={MAP_API_KEY}
+      <LoadScript googleMapsApiKey={MAP_API_KEY}>
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          center={center || { lat: 37.018000, lng: 127.835941 }} 
+          zoom={14}
         >
-          <GoogleMap
-            mapContainerStyle={containerStyle}
-            center={center}
-            zoom={14}
-          >
-            {/* 등산로 정보를 표시하는 기능(추가예정)*/}
-          </GoogleMap>
-        </LoadScript>
-      </div>
+          {/* 등산로 정보를 표시하는 기능(추가예정)*/}
+        </GoogleMap>
+      </LoadScript>
     </div>
   );
 }
