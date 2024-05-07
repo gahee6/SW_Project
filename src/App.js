@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { GoogleMap, LoadScript } from '@react-google-maps/api';
 import JSZip from 'jszip';
 
-const MAP_API_KEY = 'AIzaSyDLaff4Af2a3lO_UvfNsy-QzKCnDnV9Ol0';
-const MOUNTAIN_API_KEY = 'GM2bKdaGinIelgRZx7EEEyYv27HTHfFwZruRfGFxIWsjag8Xj%2BMATGK5rS38CISJTlRIIziNpe4eiVFpW97zlQ%3D%3D';
+const MAP_API_KEY = ' ';
+const MOUNTAIN_API_KEY = ' ';
 
 const containerStyle = {
   width: '100%',
