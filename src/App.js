@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
 import { GoogleMap, LoadScript } from '@react-google-maps/api';
-import JSZip from 'jszip';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import Suninfo from './Suninfo';
 import Main from './Main';
@@ -20,7 +19,8 @@ function App() {
   const [searchError, setSearchError] = useState(false);
   const [center, setCenter] = useState(null);
   const [zoom, setZoom] = useState(null);
-  const [mountainInfo, setMountainInfo] = useState(null); // 새로운 상태 변수 추가
+  const [mountainInfo, setMountainInfo] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleInputChange = (event) => {
     setMountainName(event.target.value);
@@ -28,14 +28,20 @@ function App() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setTrailData(null);
+    setMountainInfo(null);
+    setSearchError(false);
+    setLoading(true);
+
     if (!mountainName.trim()) {
       setSearchError(true);
+      setLoading(false);
       return;
     }
 
     const geocoder = new window.google.maps.Geocoder();
 
-    geocoder.geocode({ address: mountainName }, (results, status) => {
+    geocoder.geocode({ address: mountainName }, async (results, status) => {
       if (status === "OK") {
         const mt_pt = results[0].geometry.location;
 
@@ -50,26 +56,10 @@ function App() {
     });
 
     try {
-      const trailUrl = `http://openapi.forest.go.kr/openapi/service/trailInfoService/getforestspatialdataservice?mntnNm=${encodeURIComponent(mountainName)}&serviceKey=${MOUNTAIN_API_KEY}&pageNo=1&numOfRows=10&`;
-      const trailResponse = await fetch(trailUrl);
-      const trailData = await trailResponse.text();
-      const parser = new DOMParser();
-      const trailDataInfo = parser.parseFromString(trailData, "text/xml");
-      console.log("trailData", trailDataInfo);
-
-      const zipFileURL = trailDataInfo.getElementsByTagName('mntnfile')[0].textContent;
-      handleZipFile(zipFileURL);
-
-      if (trailDataInfo.getElementsByTagName('totalCount')[0].textContent === '0') {
-        setSearchError(true);
-      } else {
-        setTrailData(trailDataInfo);
-        setSearchError(false);
-      }
-
       const infoUrl = `http://openapi.forest.go.kr/openapi/service/trailInfoService/getforeststoryservice?mntnNm=${encodeURIComponent(mountainName)}&serviceKey=${MOUNTAIN_API_KEY}`;
       const infoResponse = await fetch(infoUrl);
       const infoData = await infoResponse.text();
+      const parser = new DOMParser();
       const infoDataParsed = parser.parseFromString(infoData, "text/xml");
       console.log("infoData", infoDataParsed);
 
@@ -79,29 +69,21 @@ function App() {
         famousMountainMap: infoDataParsed.getElementsByTagName('hndfmsmtnmapimageseq')[0].textContent,
         mountainImage: infoDataParsed.getElementsByTagName('mntnattchimageseq')[0].textContent,
         subTitle: infoDataParsed.getElementsByTagName('mntnsbttlinfo')[0].textContent,
-        recommendedCourseImage: infoDataParsed.getElementsByTagName('rcmmncoursimageseq')[0].textContent,
         height: infoDataParsed.getElementsByTagName('mntninfohght')[0].textContent,
+        trafficinfo: infoDataParsed.getElementsByTagName('pbtrninfodscrt')[0].textContent
       };
 
       setMountainInfo(mountainDetails);
     } catch (error) {
       console.error('데이터를 가져오는 중 오류가 발생했습니다:', error);
       setSearchError(true);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleZipFile = async (zipFileURL) => {
-    try {
-      const proxyUrl = 'http://localhost:4000/proxy?url=';
-      const response = await fetch(proxyUrl + encodeURIComponent(zipFileURL));
-      const zipBlob = await response.blob();
-      const zip = await JSZip.loadAsync(zipBlob);
-      zip.forEach((relativePath, zipEntry) => {
-        console.log("File:", relativePath);
-      });
-    } catch (error) {
-      console.error('ZIP 파일을 다운로드하거나 해제하는 중 오류가 발생했습니다:', error);
-    }
+  const createMarkup = (html) => {
+    return { __html: html };
   };
 
   return (
@@ -123,6 +105,7 @@ function App() {
                 </label>
                 <button type="submit">검색</button>
               </form>
+              {loading && <p>검색 중입니다...</p>}
               {trailData && <p>{mountainName}에 대한 등산로 정보를 검색합니다.</p>}
               {searchError && <p>검색 결과가 없습니다.</p>}
               
@@ -137,13 +120,28 @@ function App() {
               {mountainInfo && (
                 <div className="mountain-info">
                   <h2>{mountainName}</h2>
-                  <p>{mountainInfo.detailedInfo}</p>
-                  <p>높이: {mountainInfo.height}m</p>
-                  <p>{mountainInfo.tourismInfo}</p>
-                  <p>부제: {mountainInfo.subTitle}</p>
                   <img src={mountainInfo.famousMountainMap} alt="100대명산 지도" />
                   <img src={mountainInfo.mountainImage} alt="산 정보 이미지" />
-                  <img src={mountainInfo.recommendedCourseImage} alt="추천 코스 이미지" />
+                  <div>
+                    <h3>부제</h3>
+                    <p>{mountainInfo.subTitle}</p>
+                  </div>
+                  <div>
+                    <h3>높이</h3>
+                    <p>{mountainInfo.height}m</p>
+                  </div>
+                  <div style={{ marginBottom: '1em' }}>
+                    <h3>상세정보</h3>
+                    <div dangerouslySetInnerHTML={createMarkup(mountainInfo.detailedInfo)} />
+                  </div>
+                  <div style={{ marginBottom: '1em' }}>
+                    <h3>주변관광정보와 기타코스</h3>
+                    <div dangerouslySetInnerHTML={createMarkup(mountainInfo.tourismInfo)} />
+                  </div>
+                  <div>
+                    <h3>대중교통 정보</h3>
+                    <div dangerouslySetInnerHTML={createMarkup(mountainInfo.trafficinfo)}/>
+                  </div>
                 </div>
               )}
             </div>
@@ -155,6 +153,10 @@ function App() {
 }
 
 export default App;
+
+
+
+
 
 
 
